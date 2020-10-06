@@ -3,6 +3,11 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 #[derive(Deserialize)]
+struct LogLine {
+  message: String,
+}
+
+#[derive(Deserialize)]
 struct SerdeRecord {
   message: String,
   module_path: Option<String>,
@@ -23,15 +28,17 @@ fn main() -> anyhow::Result<()> {
   let mut line = String::new();
   loop {
     stdin.read_line(&mut line)?;
-    match serde_json::from_str::<SerdeRecord>(&line) {
+    match serde_json::from_str::<LogLine>(&line)
+      .and_then(|log_line| serde_json::from_str::<SerdeRecord>(&log_line.message))
+    {
       Ok(record) => {
-        log_mdc::extend(record.mdc.iter());
         let mut thread_builder = std::thread::Builder::new();
         if let Some(thread) = &record.thread {
           thread_builder = thread_builder.name(thread.clone());
         }
         thread_builder
           .spawn(move || {
+            log_mdc::extend(record.mdc.iter());
             let message = &record.message;
             if let Some(mut console) = ConsoleWriter::stdout() {
               logger
