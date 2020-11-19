@@ -14,3 +14,4 @@ log = "0.4.11"
 chrono = { version = "0.4.19", features = ["serde"] }
 log-mdc = "0.1.0"
 anyhow = "1.0.32"
+structopt = "0.3.20"
