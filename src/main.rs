@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use log4rs::encode::{pattern::PatternEncoder, writer::console::ConsoleWriter, Encode};
 use serde::Deserialize;
-use std::collections::HashMap;
 use structopt::StructOpt;
+use tokio::io::{AsyncBufReadExt, BufReader};
 
 #[derive(Deserialize)]
 struct LogLine {
@@ -41,25 +43,25 @@ struct Args {
   kubectl: bool,
 }
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
   let args = Args::from_args();
   let logger = Box::new(PatternEncoder::new(
       "{h({l}):<5} {X(correlation-id):<12} {X(tenant):<30.30} {t:<20.20} {X(__log-timestamp)} - {m}{n}"
       ));
   let logger = &*Box::leak(logger);
-  let stdin = std::io::stdin();
-  let mut line = String::new();
-  loop {
-    stdin.read_line(&mut line)?;
+  let stdin = tokio::io::stdin();
+  let mut lines = BufReader::new(stdin).lines();
+  while let Some(line) = lines.next_line().await? {
     log_line(logger, &line, args.kubectl)?;
-    line.clear();
   }
+  Ok(())
 }
 
 fn log_line(logger: &'static PatternEncoder, line: &str, kubectl: bool) -> anyhow::Result<()> {
   let log_line_msg;
   let record_str = if !kubectl {
-    match serde_json::from_str::<LogLine>(&line) {
+    match serde_json::from_str::<LogLine>(line) {
       Ok(log_line) => {
         log_line_msg = log_line.message;
       }
