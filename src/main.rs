@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use log4rs::encode::{pattern::PatternEncoder, writer::console::ConsoleWriter, Encode};
+use log4rs::encode::{pattern::PatternEncoder, writer::ansi::AnsiWriter, Encode};
 use serde::Deserialize;
 use structopt::StructOpt;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -94,21 +94,21 @@ fn log_record(logger: &'static PatternEncoder, record: SerdeRecord) -> anyhow::R
       log_mdc::extend(record.mdc.iter());
       mdc_datetime(record.time);
       let message = &record.message;
-      if let Some(mut console) = ConsoleWriter::stdout() {
-        logger
-          .encode(
-            &mut console,
-            &log::Record::builder()
-              .args(format_args!("{}", message))
-              .module_path(record.module_path.as_deref())
-              .file(record.file.as_deref())
-              .line(record.line)
-              .level(record.level)
-              .target(&record.target)
-              .build(),
-          )
-          .unwrap();
-      }
+      let stdout = std::io::stdout();
+      let mut console = AnsiWriter(stdout);
+      logger
+        .encode(
+          &mut console,
+          &log::Record::builder()
+            .args(format_args!("{}", message))
+            .module_path(record.module_path.as_deref())
+            .file(record.file.as_deref())
+            .line(record.line)
+            .level(record.level)
+            .target(&record.target)
+            .build(),
+        )
+        .unwrap();
     })?
     .join()
     .unwrap();
